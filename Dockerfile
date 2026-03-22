@@ -7,5 +7,6 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /lethe .
 
 FROM scratch
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=build /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=build /lethe /lethe
 ENTRYPOINT ["/lethe"]
