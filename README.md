@@ -1,5 +1,9 @@
 # lethe
 
+<p align="center">
+  <img src="lethe.jpg" alt="lethe" width="256">
+</p>
+
 Auto-deletes Discord messages older than a configurable threshold from one or more channels.
 
 ## Environment Variables
