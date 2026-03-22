@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,10 +21,10 @@ const (
 )
 
 type config struct {
-	Token     string
-	ChannelID string
-	MaxAge    time.Duration
-	Interval  time.Duration
+	Token      string
+	ChannelIDs []string
+	MaxAge     time.Duration
+	Interval   time.Duration
 }
 
 func loadConfig() (config, error) {
@@ -34,9 +35,18 @@ func loadConfig() (config, error) {
 		return cfg, fmt.Errorf("DISCORD_TOKEN is required")
 	}
 
-	cfg.ChannelID = os.Getenv("CHANNEL_ID")
-	if cfg.ChannelID == "" {
-		return cfg, fmt.Errorf("CHANNEL_ID is required")
+	raw := os.Getenv("CHANNEL_IDS")
+	if raw == "" {
+		raw = os.Getenv("CHANNEL_ID")
+	}
+	if raw == "" {
+		return cfg, fmt.Errorf("CHANNEL_IDS is required (comma-separated)")
+	}
+	for _, id := range strings.Split(raw, ",") {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			cfg.ChannelIDs = append(cfg.ChannelIDs, id)
+		}
 	}
 
 	maxAge := os.Getenv("MAX_AGE")
