@@ -1,13 +1,13 @@
 # lethe
 
-Auto-deletes Discord messages older than a configurable threshold from a channel.
+Auto-deletes Discord messages older than a configurable threshold from one or more channels.
 
 ## Environment Variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `DISCORD_TOKEN` | yes | — | Bot token |
-| `CHANNEL_ID` | yes | — | Target channel ID |
+| `CHANNEL_IDS` | yes | — | Comma-separated channel IDs |
 | `MAX_AGE` | yes | — | Message age threshold (e.g. `720h`, `168h`) |
 | `INTERVAL` | no | `6h` | How often to run cleanup |
 
@@ -25,7 +25,7 @@ docker compose up -d
 
 ```bash
 go build -o lethe .
-DISCORD_TOKEN=... CHANNEL_ID=... MAX_AGE=720h ./lethe
+DISCORD_TOKEN=... CHANNEL_IDS=123,456 MAX_AGE=720h ./lethe
 ```
 
 ## Discord Bot Setup
@@ -42,7 +42,8 @@ DISCORD_TOKEN=... CHANNEL_ID=... MAX_AGE=720h ./lethe
 - Then repeats every `INTERVAL`
 - Messages < 14 days old are bulk-deleted (up to 100 per API call)
 - Messages >= 14 days old are deleted individually (Discord API limitation)
-- REST-only — no gateway connection, minimal resource usage
+- Supports multiple channels via comma-separated `CHANNEL_IDS`
+- Shows as online in Discord with "Watching cleanup" status
 
 ## License
 

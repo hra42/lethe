@@ -4,6 +4,6 @@ services:
     restart: unless-stopped
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - CHANNEL_ID=${CHANNEL_ID}
+      - CHANNEL_IDS=${CHANNEL_IDS}
       - MAX_AGE=${MAX_AGE:-720h}
       - INTERVAL=${INTERVAL:-6h}
