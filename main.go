@@ -11,20 +11,22 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/go-co-op/gocron/v2"
 )
 
 const (
 	bulkDeleteMax   = 100
 	fetchLimit      = 100
 	bulkMaxAge      = 14 * 24 * time.Hour // Discord's 14-day limit for bulk delete
-	defaultInterval = 6 * time.Hour
+	defaultSchedule = "0 */6 * * *"       // every 6 hours
 )
 
 type config struct {
 	Token      string
 	ChannelIDs []string
 	MaxAge     time.Duration
-	Interval   time.Duration
+	Schedules  []string
+	Location   *time.Location
 }
 
 func loadConfig() (config, error) {
@@ -59,13 +61,24 @@ func loadConfig() (config, error) {
 	}
 	cfg.MaxAge = d
 
-	cfg.Interval = defaultInterval
-	if v := os.Getenv("INTERVAL"); v != "" {
-		d, err := time.ParseDuration(v)
-		if err != nil {
-			return cfg, fmt.Errorf("invalid INTERVAL %q: %w", v, err)
+	scheduleRaw := os.Getenv("SCHEDULE")
+	if scheduleRaw == "" {
+		scheduleRaw = defaultSchedule
+	}
+	for _, s := range strings.Split(scheduleRaw, ";") {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			cfg.Schedules = append(cfg.Schedules, s)
 		}
-		cfg.Interval = d
+	}
+
+	cfg.Location = time.UTC
+	if tz := os.Getenv("TZ"); tz != "" {
+		loc, err := time.LoadLocation(tz)
+		if err != nil {
+			return cfg, fmt.Errorf("invalid TZ %q: %w", tz, err)
+		}
+		cfg.Location = loc
 	}
 
 	return cfg, nil
@@ -95,7 +108,11 @@ func main() {
 		slog.Error("failed to open gateway connection", "error", err)
 		os.Exit(1)
 	}
-	defer session.Close()
+	defer func() {
+		if err := session.Close(); err != nil {
+			slog.Error("failed to close session", "error", err)
+		}
+	}()
 
 	if err := session.UpdateStatusComplex(discordgo.UpdateStatusData{
 		Activities: []*discordgo.Activity{{
@@ -110,23 +127,36 @@ func main() {
 	slog.Info("starting lethe",
 		"channels", cfg.ChannelIDs,
 		"max_age", cfg.MaxAge,
-		"interval", cfg.Interval,
+		"schedules", cfg.Schedules,
+		"timezone", cfg.Location,
 	)
 
-	runCleanup(ctx, session, cfg)
+	scheduler, err := gocron.NewScheduler(gocron.WithLocation(cfg.Location))
+	if err != nil {
+		slog.Error("failed to create scheduler", "error", err)
+		os.Exit(1)
+	}
 
-	ticker := time.NewTicker(cfg.Interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			slog.Info("shutting down")
-			return
-		case <-ticker.C:
-			runCleanup(ctx, session, cfg)
+	for _, schedule := range cfg.Schedules {
+		_, err = scheduler.NewJob(
+			gocron.CronJob(schedule, false),
+			gocron.NewTask(func() {
+				runCleanup(ctx, session, cfg)
+			}),
+		)
+		if err != nil {
+			slog.Error("invalid schedule", "schedule", schedule, "error", err)
+			os.Exit(1)
 		}
 	}
+
+	// Run cleanup immediately on start, then let the scheduler handle the rest
+	runCleanup(ctx, session, cfg)
+	scheduler.Start()
+
+	<-ctx.Done()
+	slog.Info("shutting down")
+	_ = scheduler.Shutdown()
 }
 
 func runCleanup(ctx context.Context, s *discordgo.Session, cfg config) {
