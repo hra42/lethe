@@ -108,7 +108,7 @@ func main() {
 	}
 
 	slog.Info("starting lethe",
-		"channel", cfg.ChannelID,
+		"channels", cfg.ChannelIDs,
 		"max_age", cfg.MaxAge,
 		"interval", cfg.Interval,
 	)
@@ -132,14 +132,25 @@ func main() {
 func runCleanup(ctx context.Context, s *discordgo.Session, cfg config) {
 	slog.Info("cleanup started")
 
-	messages, err := fetchExpiredMessages(ctx, s, cfg.ChannelID, cfg.MaxAge)
+	for _, channelID := range cfg.ChannelIDs {
+		if ctx.Err() != nil {
+			return
+		}
+		cleanChannel(ctx, s, channelID, cfg.MaxAge)
+	}
+
+	slog.Info("cleanup complete")
+}
+
+func cleanChannel(ctx context.Context, s *discordgo.Session, channelID string, maxAge time.Duration) {
+	messages, err := fetchExpiredMessages(ctx, s, channelID, maxAge)
 	if err != nil {
-		slog.Error("failed to fetch messages", "error", err)
+		slog.Error("failed to fetch messages", "channel", channelID, "error", err)
 		return
 	}
 
 	if len(messages) == 0 {
-		slog.Info("no expired messages found")
+		slog.Info("no expired messages found", "channel", channelID)
 		return
 	}
 
@@ -154,10 +165,10 @@ func runCleanup(ctx context.Context, s *discordgo.Session, cfg config) {
 	}
 
 	deleted := 0
-	deleted += bulkDelete(s, cfg.ChannelID, bulkIDs)
-	deleted += deleteIndividual(ctx, s, cfg.ChannelID, oldIDs)
+	deleted += bulkDelete(s, channelID, bulkIDs)
+	deleted += deleteIndividual(ctx, s, channelID, oldIDs)
 
-	slog.Info("cleanup complete", "deleted", deleted, "total_expired", len(messages))
+	slog.Info("channel cleanup complete", "channel", channelID, "deleted", deleted, "total_expired", len(messages))
 }
 
 func fetchExpiredMessages(ctx context.Context, s *discordgo.Session, channelID string, maxAge time.Duration) ([]*discordgo.Message, error) {
@@ -192,7 +203,7 @@ func fetchExpiredMessages(ctx context.Context, s *discordgo.Session, channelID s
 		}
 	}
 
-	slog.Info("fetched expired messages", "count", len(expired))
+	slog.Info("fetched expired messages", "channel", channelID, "count", len(expired))
 	return expired, nil
 }
 
