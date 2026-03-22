@@ -13,7 +13,8 @@ Auto-deletes Discord messages older than a configurable threshold from one or mo
 | `DISCORD_TOKEN` | yes | — | Bot token |
 | `CHANNEL_IDS` | yes | — | Comma-separated channel IDs |
 | `MAX_AGE` | yes | — | Message age threshold (e.g. `720h`, `168h`) |
-| `INTERVAL` | no | `6h` | How often to run cleanup |
+| `SCHEDULE` | no | `0 */6 * * *` | Cron expression(s), semicolon-separated for multiple (e.g. `0 3 * * *;0 15 * * *`) |
+| `TZ` | no | `UTC` | Timezone for schedules (e.g. `Europe/Berlin`) |
 
 ## Quick Start
 
